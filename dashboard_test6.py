@@ -5,9 +5,7 @@ import statsmodels.api as sm
 
 st.set_page_config(page_title="Diabetes Readmission Dashboard", layout="wide")
 
-# =========================
 # Load and preprocess data
-# =========================
 @st.cache_data
 def load_data(url):
     df = pd.read_csv(url, nrows=1000)
@@ -24,9 +22,7 @@ df = load_data(url)
 
 st.title("Diabetes Hospital Readmission Dashboard")
 
-# =========================
 # Demographics Module
-# =========================
 st.header("Demographics Analysis")
 age_options = df['age'].unique().tolist()
 selected_age = st.multiselect("Select Age Groups:", age_options, default=age_options[:3])
@@ -65,9 +61,7 @@ if len(demo_filtered) > 0:
 else:
     st.write("No data available for this selection.")
 
-# =========================
 # Hospital Stay Module
-# =========================
 st.header("Hospital Stay Analysis")
 time_min = int(df['time_in_hospital'].min())
 time_max = int(df['time_in_hospital'].max())
@@ -94,9 +88,7 @@ if len(time_filtered) > 0:
 else:
     st.write("No data available for this length of stay.")
 
-# =========================
 # Visit History Module
-# =========================
 st.header("Visit History Analysis")
 visit_type = st.selectbox("Select Visit Type:", ["number_outpatient", "number_emergency", "number_inpatient"])
 visit_filtered = df[[visit_type, 'readmitted']]
@@ -105,9 +97,8 @@ fig_visit = px.line(visit_grouped, x=visit_grouped.index, y=visit_grouped.column
                     title=f"Readmission Trend by {visit_type} Count", markers=True)
 st.plotly_chart(fig_visit, use_container_width=True)
 
-# =========================
+
 # Medication & Treatment Module
-# =========================
 st.header("Medication & Treatment Analysis")
 # List all drug columns dynamically
 drug_columns = ['metformin','repaglinide','nateglinide','chlorpropamide','glimepiride','acetohexamide',
@@ -129,9 +120,7 @@ if not med_filtered.empty:
 else:
     st.write(f"No data available for {selected_drug} usage.")
 
-# =========================
 # Numeric Feature Analysis Module
-# =========================
 st.header("Numeric Feature Analysis")
 
 # Select numeric columns (exclude IDs and mostly categorical)
@@ -166,9 +155,7 @@ for i, row in means.iterrows():
 
 st.plotly_chart(fig_num, use_container_width=True)
 
-# =========================
 # Overall Readmission
-# =========================
 st.header("Overall Readmission Overview")
 overall_readmit = df['readmitted'].value_counts().reset_index()
 overall_readmit.columns = ['readmitted', 'count']
