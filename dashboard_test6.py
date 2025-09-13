@@ -37,7 +37,8 @@ selected_age = st.multiselect("Select Age Groups:", age_options, default=age_opt
 gender_options = df['gender'].unique().tolist()
 selected_gender = st.multiselect("Select Gender:", gender_options, default=gender_options)
 
-race_options = df['race'].unique().tolist()
+# Drop NA values in race before options
+race_options = df['race'].dropna().unique().tolist()
 selected_race = st.multiselect("Select Race:", race_options, default=race_options)
 
 demo_filtered = df[
@@ -66,14 +67,13 @@ if len(demo_filtered) > 0:
                             title="Gender Distribution", hole=0.3)
         st.plotly_chart(fig_gender, use_container_width=True)
     
-    # Race distribution
+    # Race distribution (Bar Chart, NA dropped)
     with col3:
         st.subheader("Race Distribution")
         race_dist = demo_filtered['race'].value_counts().reset_index()
         race_dist.columns = ['race', 'count']
-        fig_race = px.pie(race_dist, names='race', values='count',
-                          title="Race Distribution", hole=0.3,
-                          color_discrete_sequence=px.colors.qualitative.Pastel)
+        fig_race = px.bar(race_dist, x='race', y='count', color='race',
+                          title="Race Distribution")
         st.plotly_chart(fig_race, use_container_width=True)
     
     # Readmission rate
