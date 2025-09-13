@@ -32,7 +32,7 @@ st.title("Diabetes Hospital Readmission Dashboard")
 st.header("Demographics Analysis")
 
 age_options = df['age'].unique().tolist()
-selected_age = st.multiselect("Select Age Groups:", age_options, default=age_options[:3])
+selected_age = st.multiselect("Select Age Groups:", age_options, default=age_options)
 
 gender_options = df['gender'].unique().tolist()
 selected_gender = st.multiselect("Select Gender:", gender_options, default=gender_options)
