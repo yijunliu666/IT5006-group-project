@@ -30,16 +30,24 @@ st.title("Diabetes Hospital Readmission Dashboard")
 
 # Demographics Module
 st.header("Demographics Analysis")
+
 age_options = df['age'].unique().tolist()
 selected_age = st.multiselect("Select Age Groups:", age_options, default=age_options[:3])
 
 gender_options = df['gender'].unique().tolist()
 selected_gender = st.multiselect("Select Gender:", gender_options, default=gender_options)
 
-demo_filtered = df[(df['age'].isin(selected_age)) & (df['gender'].isin(selected_gender))]
+race_options = df['race'].unique().tolist()
+selected_race = st.multiselect("Select Race:", race_options, default=race_options)
+
+demo_filtered = df[
+    (df['age'].isin(selected_age)) &
+    (df['gender'].isin(selected_gender)) &
+    (df['race'].isin(selected_race))
+]
 
 if len(demo_filtered) > 0:
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     
     # Age distribution
     with col1:
@@ -54,8 +62,19 @@ if len(demo_filtered) > 0:
         st.subheader("Gender Distribution")
         gender_dist = demo_filtered['gender'].value_counts().reset_index()
         gender_dist.columns = ['gender', 'count']
-        fig_gender = px.pie(gender_dist, names='gender', values='count', title="Gender Distribution", hole=0.3)
+        fig_gender = px.pie(gender_dist, names='gender', values='count',
+                            title="Gender Distribution", hole=0.3)
         st.plotly_chart(fig_gender, use_container_width=True)
+    
+    # Race distribution
+    with col3:
+        st.subheader("Race Distribution")
+        race_dist = demo_filtered['race'].value_counts().reset_index()
+        race_dist.columns = ['race', 'count']
+        fig_race = px.pie(race_dist, names='race', values='count',
+                          title="Race Distribution", hole=0.3,
+                          color_discrete_sequence=px.colors.qualitative.Pastel)
+        st.plotly_chart(fig_race, use_container_width=True)
     
     # Readmission rate
     st.subheader("Readmission Rate for Selected Demographics")
@@ -180,37 +199,48 @@ def cramers_v(x, y):
     kcorr = k - ((k-1)**2)/(n-1)
     return np.sqrt(phi2corr / min((kcorr-1), (rcorr-1)))
 
-# Categorical variables
-cat_vars = ['race', 'gender', 'age', 'time_in_hospital', 
-            'diag_1', 'diag_2', 'diag_3', 
-            'metformin','repaglinide','glimepiride','glipizide','glyburide',
-            'pioglitazone','rosiglitazone','insulin','change','diabetesMed']
+# Default categorical variables
+default_cat_vars = ['race', 'gender', 'age', 'time_in_hospital', 
+                    'diag_1', 'diag_2', 'diag_3', 
+                    'metformin','repaglinide','glimepiride','glipizide','glyburide',
+                    'pioglitazone','rosiglitazone','insulin','change','diabetesMed']
+default_cat_vars = [c for c in default_cat_vars if c in df.columns]
 
-cat_vars = [c for c in cat_vars if c in df.columns]
+# Let user select categorical features
+selected_cat_vars = st.multiselect(
+    "Select categorical features for Cramér's V correlation:",
+    options=default_cat_vars,
+    default=default_cat_vars
+)
 
-cramers_results = pd.DataFrame(np.zeros((len(cat_vars), len(cat_vars))), 
-                               index=cat_vars, columns=cat_vars)
+if selected_cat_vars and len(selected_cat_vars) > 1:
+    cramers_results = pd.DataFrame(
+        np.zeros((len(selected_cat_vars), len(selected_cat_vars))), 
+        index=selected_cat_vars, columns=selected_cat_vars
+    )
 
-for col1 in cat_vars:
-    for col2 in cat_vars:
-        if col1 != col2:
-            cramers_results.loc[col1, col2] = cramers_v(df[col1], df[col2])
+    for col1 in selected_cat_vars:
+        for col2 in selected_cat_vars:
+            if col1 != col2:
+                cramers_results.loc[col1, col2] = cramers_v(df[col1], df[col2])
 
-fig, ax = plt.subplots(figsize=(12, 8))
-sns.heatmap(cramers_results, annot=False, cmap="coolwarm", ax=ax)
-plt.title("Cramér's V Correlation Heatmap (Categorical Variables)")
-st.pyplot(fig)
+    fig, ax = plt.subplots(figsize=(12, 8))
+    sns.heatmap(cramers_results, annot=True, fmt=".2f", cmap="coolwarm", ax=ax)
+    plt.title("Cramér's V Correlation Heatmap (Categorical Variables)")
+    st.pyplot(fig)
+else:
+    st.info("Please select at least two categorical features.")
 
 # Spearman for numeric variables
 num_vars = ['number_inpatient', 'number_emergency', 'number_outpatient',
             'number_diagnoses', 'num_medications', 'time_in_hospital',
             'num_procedures', 'num_lab_procedures']
-
 num_vars = [c for c in num_vars if c in df.columns]
+
 spearman_corr = df[num_vars].corr(method='spearman')
 
 fig2, ax2 = plt.subplots(figsize=(10, 6))
-sns.heatmap(spearman_corr, annot=True, cmap="coolwarm", ax=ax2)
+sns.heatmap(spearman_corr, annot=True, fmt=".2f", cmap="coolwarm", ax=ax2)
 plt.title("Spearman Correlation Heatmap (Numerical Variables)")
 st.pyplot(fig2)
 
