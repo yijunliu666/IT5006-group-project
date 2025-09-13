@@ -2,6 +2,11 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import statsmodels.api as sm
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import LabelEncoder
+from scipy.stats import chi2_contingency
 
 st.set_page_config(page_title="Diabetes Readmission Dashboard", layout="wide")
 
@@ -21,6 +26,7 @@ url = "https://archive.ics.uci.edu/static/public/296/data.csv"
 df = load_data(url)
 
 st.title("Diabetes Hospital Readmission Dashboard")
+
 
 # Demographics Module
 st.header("Demographics Analysis")
@@ -61,6 +67,7 @@ if len(demo_filtered) > 0:
 else:
     st.write("No data available for this selection.")
 
+
 # Hospital Stay Module
 st.header("Hospital Stay Analysis")
 time_min = int(df['time_in_hospital'].min())
@@ -87,6 +94,7 @@ if len(time_filtered) > 0:
         st.plotly_chart(fig_time, use_container_width=True)
 else:
     st.write("No data available for this length of stay.")
+
 
 # Visit History Module
 st.header("Visit History Analysis")
@@ -119,6 +127,7 @@ if not med_filtered.empty:
     st.plotly_chart(fig_med, use_container_width=True)
 else:
     st.write(f"No data available for {selected_drug} usage.")
+
 
 # Numeric Feature Analysis Module
 st.header("Numeric Feature Analysis")
@@ -154,6 +163,57 @@ for i, row in means.iterrows():
     )
 
 st.plotly_chart(fig_num, use_container_width=True)
+
+
+# Correlation Analysis Module
+st.header("Correlation Analysis")
+
+# Cramér’s V for categorical variables
+def cramers_v(x, y):
+    confusion_matrix = pd.crosstab(x, y)
+    chi2 = chi2_contingency(confusion_matrix)[0]
+    n = confusion_matrix.sum().sum()
+    phi2 = chi2 / n
+    r, k = confusion_matrix.shape
+    phi2corr = max(0, phi2 - ((k-1)*(r-1))/(n-1))
+    rcorr = r - ((r-1)**2)/(n-1)
+    kcorr = k - ((k-1)**2)/(n-1)
+    return np.sqrt(phi2corr / min((kcorr-1), (rcorr-1)))
+
+# Categorical variables
+cat_vars = ['race', 'gender', 'age', 'time_in_hospital', 
+            'diag_1', 'diag_2', 'diag_3', 
+            'metformin','repaglinide','glimepiride','glipizide','glyburide',
+            'pioglitazone','rosiglitazone','insulin','change','diabetesMed']
+
+cat_vars = [c for c in cat_vars if c in df.columns]
+
+cramers_results = pd.DataFrame(np.zeros((len(cat_vars), len(cat_vars))), 
+                               index=cat_vars, columns=cat_vars)
+
+for col1 in cat_vars:
+    for col2 in cat_vars:
+        if col1 != col2:
+            cramers_results.loc[col1, col2] = cramers_v(df[col1], df[col2])
+
+fig, ax = plt.subplots(figsize=(12, 8))
+sns.heatmap(cramers_results, annot=False, cmap="coolwarm", ax=ax)
+plt.title("Cramér's V Correlation Heatmap (Categorical Variables)")
+st.pyplot(fig)
+
+# Spearman for numeric variables
+num_vars = ['number_inpatient', 'number_emergency', 'number_outpatient',
+            'number_diagnoses', 'num_medications', 'time_in_hospital',
+            'num_procedures', 'num_lab_procedures']
+
+num_vars = [c for c in num_vars if c in df.columns]
+spearman_corr = df[num_vars].corr(method='spearman')
+
+fig2, ax2 = plt.subplots(figsize=(10, 6))
+sns.heatmap(spearman_corr, annot=True, cmap="coolwarm", ax=ax2)
+plt.title("Spearman Correlation Heatmap (Numerical Variables)")
+st.pyplot(fig2)
+
 
 # Overall Readmission
 st.header("Overall Readmission Overview")
