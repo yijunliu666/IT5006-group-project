@@ -13,7 +13,7 @@ st.set_page_config(page_title="Diabetes Readmission Dashboard", layout="wide")
 # Load and preprocess data
 @st.cache_data
 def load_data(url):
-    df = pd.read_csv(url, nrows=1000)
+    df = pd.read_csv(url)
     # Fill missing values
     df['weight'] = df['weight'].fillna('Missing')
     df['payer_code'] = df['payer_code'].fillna('Unknown')
