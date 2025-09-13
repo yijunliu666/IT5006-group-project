@@ -188,61 +188,93 @@ st.plotly_chart(fig_num, use_container_width=True)
 st.header("Correlation Analysis")
 
 # Cramér’s V for categorical variables
+cat_features_all = ['race', 'gender', 'age', 'time_in_hospital', 'diag_1', 'diag_2', 'diag_3',
+                    'metformin', 'repaglinide','glimepiride','glipizide', 'glyburide',
+                    'pioglitazone','rosiglitazone','insulin','change','diabetesMed']
+
+selected_cat_features = st.multiselect("Select Categorical Features for Correlation:",
+                                       cat_features_all,
+                                       default=cat_features_all)
+
 def cramers_v(x, y):
     confusion_matrix = pd.crosstab(x, y)
     chi2 = chi2_contingency(confusion_matrix)[0]
     n = confusion_matrix.sum().sum()
-    phi2 = chi2 / n
-    r, k = confusion_matrix.shape
-    phi2corr = max(0, phi2 - ((k-1)*(r-1))/(n-1))
+    phi2 = chi2/n
+    r,k = confusion_matrix.shape
+    phi2corr = max(0, phi2 - ((k-1)*(r-1))/(n-1))    
     rcorr = r - ((r-1)**2)/(n-1)
     kcorr = k - ((k-1)**2)/(n-1)
-    return np.sqrt(phi2corr / min((kcorr-1), (rcorr-1)))
+    return np.sqrt(phi2corr / min((kcorr-1),(rcorr-1)))
 
-# Default categorical variables
-default_cat_vars = ['race', 'gender', 'age', 'time_in_hospital', 
-                    'diag_1', 'diag_2', 'diag_3', 
-                    'metformin','repaglinide','glimepiride','glipizide','glyburide',
-                    'pioglitazone','rosiglitazone','insulin','change','diabetesMed']
-default_cat_vars = [c for c in default_cat_vars if c in df.columns]
+# Compute Cramér’s V matrix
+if selected_cat_features:
+    st.subheader("Categorical Features Correlation (Cramér’s V)")
+    cramers_results = pd.DataFrame(index=selected_cat_features, columns=selected_cat_features)
 
-# Let user select categorical features
-selected_cat_vars = st.multiselect(
-    "Select categorical features for Cramér's V correlation:",
-    options=default_cat_vars,
-    default=default_cat_vars
-)
+    for col1 in selected_cat_features:
+        for col2 in selected_cat_features:
+            cramers_results.loc[col1, col2] = cramers_v(df[col1], df[col2])
 
-if selected_cat_vars and len(selected_cat_vars) > 1:
-    cramers_results = pd.DataFrame(
-        np.zeros((len(selected_cat_vars), len(selected_cat_vars))), 
-        index=selected_cat_vars, columns=selected_cat_vars
-    )
+    cramers_results = cramers_results.astype(float)
 
-    for col1 in selected_cat_vars:
-        for col2 in selected_cat_vars:
-            if col1 != col2:
-                cramers_results.loc[col1, col2] = cramers_v(df[col1], df[col2])
-
-    fig, ax = plt.subplots(figsize=(12, 8))
+    fig, ax = plt.subplots(figsize=(10,8))
     sns.heatmap(cramers_results, annot=True, fmt=".2f", cmap="coolwarm", ax=ax)
-    plt.title("Cramér's V Correlation Heatmap (Categorical Variables)")
     st.pyplot(fig)
-else:
-    st.info("Please select at least two categorical features.")
 
-# Spearman for numeric variables
-num_vars = ['number_inpatient', 'number_emergency', 'number_outpatient',
-            'number_diagnoses', 'num_medications', 'time_in_hospital',
-            'num_procedures', 'num_lab_procedures']
-num_vars = [c for c in num_vars if c in df.columns]
+# Numerical Correlation (Spearman) 
+num_features_all = ['number_inpatient', 'number_emergency', 'number_outpatient',
+                    'number_diagnoses', 'num_medications', 'time_in_hospital',
+                    'num_procedures', 'num_lab_procedures']
 
-spearman_corr = df[num_vars].corr(method='spearman')
+selected_num_features = st.multiselect("Select Numerical Features for Correlation:",
+                                       num_features_all,
+                                       default=num_features_all)
 
-fig2, ax2 = plt.subplots(figsize=(10, 6))
-sns.heatmap(spearman_corr, annot=True, fmt=".2f", cmap="coolwarm", ax=ax2)
-plt.title("Spearman Correlation Heatmap (Numerical Variables)")
-st.pyplot(fig2)
+if selected_num_features:
+    st.subheader("Numerical Features Correlation (Spearman)")
+
+    spearman_corr = df[selected_num_features].corr(method="spearman")
+
+    fig, ax = plt.subplots(figsize=(8,6))
+    sns.heatmap(spearman_corr, annot=True, fmt=".2f", cmap="YlGnBu", ax=ax)
+    st.pyplot(fig)
+
+# Correlation with Readmission
+st.subheader("Correlation with Readmission")
+
+# Encode readmission
+df['readmitted_binary'] = df['readmitted'].apply(lambda x: 0 if x=="NO" else 1)
+
+# Categorical features vs readmission (Cramér’s V)
+cat_readmit_corr = {}
+for col in selected_cat_features:
+    if df[col].notna().sum() > 0:
+        cat_readmit_corr[col] = cramers_v(df[col], df['readmitted_binary'])
+cat_readmit_corr = pd.Series(cat_readmit_corr).sort_values(ascending=True)
+
+fig_cat_corr = px.bar(cat_readmit_corr,
+                      x=cat_readmit_corr.values,
+                      y=cat_readmit_corr.index,
+                      orientation='h',
+                      title="Categorical Features vs Readmission (Cramér’s V)",
+                      labels={'x':'Cramér’s V', 'y':'Feature'})
+st.plotly_chart(fig_cat_corr, use_container_width=True)
+
+# Numerical features vs readmission (Spearman)
+num_readmit_corr = {}
+for col in selected_num_features:
+    if df[col].notna().sum() > 0:
+        num_readmit_corr[col] = spearmanr(df[col], df['readmitted_binary'])[0]
+num_readmit_corr = pd.Series(num_readmit_corr).sort_values(ascending=True)
+
+fig_num_corr = px.bar(num_readmit_corr,
+                      x=num_readmit_corr.values,
+                      y=num_readmit_corr.index,
+                      orientation='h',
+                      title="Numerical Features vs Readmission (Spearman Correlation)",
+                      labels={'x':'Spearman ρ', 'y':'Feature'})
+st.plotly_chart(fig_num_corr, use_container_width=True)
 
 
 # Overall Readmission
