@@ -6,7 +6,7 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import LabelEncoder
-from scipy.stats import chi2_contingency
+from scipy.stats import spearmanr, chi2_contingency
 
 st.set_page_config(page_title="Diabetes Readmission Dashboard", layout="wide")
 
@@ -207,17 +207,14 @@ def cramers_v(x, y):
     kcorr = k - ((k-1)**2)/(n-1)
     return np.sqrt(phi2corr / min((kcorr-1),(rcorr-1)))
 
-# Compute Cramér’s V matrix
+# Categorical correlation heatmap
 if selected_cat_features:
     st.subheader("Categorical Features Correlation (Cramér’s V)")
     cramers_results = pd.DataFrame(index=selected_cat_features, columns=selected_cat_features)
-
     for col1 in selected_cat_features:
         for col2 in selected_cat_features:
             cramers_results.loc[col1, col2] = cramers_v(df[col1], df[col2])
-
     cramers_results = cramers_results.astype(float)
-
     fig, ax = plt.subplots(figsize=(10,8))
     sns.heatmap(cramers_results, annot=True, fmt=".2f", cmap="coolwarm", ax=ax)
     st.pyplot(fig)
@@ -233,46 +230,28 @@ selected_num_features = st.multiselect("Select Numerical Features for Correlatio
 
 if selected_num_features:
     st.subheader("Numerical Features Correlation (Spearman)")
-
     spearman_corr = df[selected_num_features].corr(method="spearman")
-
-    fig, ax = plt.subplots(figsize=(8,6))
-    sns.heatmap(spearman_corr, annot=True, fmt=".2f", cmap="YlGnBu", ax=ax)
+    fig, ax = plt.subplots(figsize=(10,8))
+    sns.heatmap(spearman_corr, annot=True, fmt=".2f", cmap="coolwarm", ax=ax)  # same cmap as categorical
     st.pyplot(fig)
 
 # Correlation with Readmission
 st.subheader("Correlation with Readmission")
-
-# Encode readmission
 df['readmitted_binary'] = df['readmitted'].apply(lambda x: 0 if x=="NO" else 1)
 
-# Categorical features vs readmission (Cramér’s V)
-cat_readmit_corr = {}
-for col in selected_cat_features:
-    if df[col].notna().sum() > 0:
-        cat_readmit_corr[col] = cramers_v(df[col], df['readmitted_binary'])
+# Categorical vs readmission
+cat_readmit_corr = {col: cramers_v(df[col], df['readmitted_binary']) for col in selected_cat_features}
 cat_readmit_corr = pd.Series(cat_readmit_corr).sort_values(ascending=True)
-
-fig_cat_corr = px.bar(cat_readmit_corr,
-                      x=cat_readmit_corr.values,
-                      y=cat_readmit_corr.index,
-                      orientation='h',
-                      title="Categorical Features vs Readmission (Cramér’s V)",
+fig_cat_corr = px.bar(cat_readmit_corr, x=cat_readmit_corr.values, y=cat_readmit_corr.index,
+                      orientation='h', title="Categorical Features vs Readmission (Cramér’s V)",
                       labels={'x':'Cramér’s V', 'y':'Feature'})
 st.plotly_chart(fig_cat_corr, use_container_width=True)
 
-# Numerical features vs readmission (Spearman)
-num_readmit_corr = {}
-for col in selected_num_features:
-    if df[col].notna().sum() > 0:
-        num_readmit_corr[col] = spearmanr(df[col], df['readmitted_binary'])[0]
+# Numerical vs readmission
+num_readmit_corr = {col: spearmanr(df[col], df['readmitted_binary'])[0] for col in selected_num_features}
 num_readmit_corr = pd.Series(num_readmit_corr).sort_values(ascending=True)
-
-fig_num_corr = px.bar(num_readmit_corr,
-                      x=num_readmit_corr.values,
-                      y=num_readmit_corr.index,
-                      orientation='h',
-                      title="Numerical Features vs Readmission (Spearman Correlation)",
+fig_num_corr = px.bar(num_readmit_corr, x=num_readmit_corr.values, y=num_readmit_corr.index,
+                      orientation='h', title="Numerical Features vs Readmission (Spearman ρ)",
                       labels={'x':'Spearman ρ', 'y':'Feature'})
 st.plotly_chart(fig_num_corr, use_container_width=True)
 
